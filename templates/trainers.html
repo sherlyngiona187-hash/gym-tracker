@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Trainers — GymTrack Pro{% endblock %}
+{% block page_title %}Trainers{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <p class="page-subtitle">Manage trainers and their specializations</p>
+    <button class="btn btn-primary" onclick="openTrainerModal()">
+        <i data-lucide="plus"></i> Add Trainer
+    </button>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="data-table" id="trainersTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Specialization</th>
+                    <th>Students</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="trainersBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', loadTrainers);
+
+async function loadTrainers() {
+    const res = await fetch('/api/trainers');
+    const trainers = await res.json();
+    const tbody = document.getElementById('trainersBody');
+    tbody.innerHTML = trainers.map(t => `
+        <tr>
+            <td>${t.Trainer_ID}</td>
+            <td><strong>${t.Trainer_Name}</strong></td>
+            <td><span class="badge badge-purple">${t.Specialization}</span></td>
+            <td>${t.student_count}</td>
+            <td class="actions">
+                <button class="btn-icon btn-edit" onclick='openTrainerModal(${JSON.stringify(t)})' title="Edit">
+                    <i data-lucide="pencil"></i>
+                </button>
+                <button class="btn-icon btn-delete" onclick="deleteTrainer(${t.Trainer_ID})" title="Delete">
+                    <i data-lucide="trash-2"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+    lucide.createIcons();
+}
+
+function openTrainerModal(t = null) {
+    const isEdit = !!t;
+    document.getElementById('modalTitle').textContent = isEdit ? 'Edit Trainer' : 'Add Trainer';
+    document.getElementById('modalBody').innerHTML = `
+        <form id="trainerForm" onsubmit="saveTrainer(event, ${isEdit ? t.Trainer_ID : 'null'})">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" name="Trainer_Name" value="${isEdit ? t.Trainer_Name : ''}" required>
+                </div>
+                <div class="form-group full-width">
+                    <label>Specialization</label>
+                    <input type="text" name="Specialization" value="${isEdit ? t.Specialization : ''}" required>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">${isEdit ? 'Update' : 'Add'} Trainer</button>
+            </div>
+        </form>
+    `;
+    openModal();
+    lucide.createIcons();
+}
+
+async function saveTrainer(e, id) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = Object.fromEntries(fd);
+    const url = id ? `/api/trainers/${id}` : '/api/trainers';
+    const method = id ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+    const result = await res.json();
+    if (result.success) {
+        showToast(id ? 'Trainer updated!' : 'Trainer added!', 'success');
+        closeModal(); loadTrainers();
+    } else showToast('Error: ' + result.error, 'error');
+}
+
+async function deleteTrainer(id) {
+    if (!confirm('Delete this trainer?')) return;
+    const res = await fetch(`/api/trainers/${id}`, { method: 'DELETE' });
+    const result = await res.json();
+    if (result.success) { showToast('Trainer deleted!', 'success'); loadTrainers(); }
+    else showToast('Error: ' + result.error, 'error');
+}
+</script>
+{% endblock %}

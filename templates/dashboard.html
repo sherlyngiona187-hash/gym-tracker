@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — GymTrack Pro{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="stats-grid" id="statsGrid">
+    <div class="stat-card stat-card--primary">
+        <div class="stat-icon"><i data-lucide="users"></i></div>
+        <div class="stat-info">
+            <span class="stat-value" id="statMembers">-</span>
+            <span class="stat-label">Total Members</span>
+        </div>
+    </div>
+    <div class="stat-card stat-card--green">
+        <div class="stat-icon"><i data-lucide="user-check"></i></div>
+        <div class="stat-info">
+            <span class="stat-value" id="statTrainers">-</span>
+            <span class="stat-label">Trainers</span>
+        </div>
+    </div>
+    <div class="stat-card stat-card--amber">
+        <div class="stat-icon"><i data-lucide="indian-rupee"></i></div>
+        <div class="stat-info">
+            <span class="stat-value" id="statRevenue">-</span>
+            <span class="stat-label">Total Revenue</span>
+        </div>
+    </div>
+    <div class="stat-card stat-card--rose">
+        <div class="stat-icon"><i data-lucide="heart-pulse"></i></div>
+        <div class="stat-info">
+            <span class="stat-value" id="statBodyFat">-</span>
+            <span class="stat-label">Avg Body Fat %</span>
+        </div>
+    </div>
+    <div class="stat-card stat-card--cyan">
+        <div class="stat-icon"><i data-lucide="calendar-check"></i></div>
+        <div class="stat-info">
+            <span class="stat-value" id="statPresent">-</span>
+            <span class="stat-label">Present Today</span>
+        </div>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3 class="chart-title"><i data-lucide="bar-chart-3"></i> Monthly Revenue</h3>
+        <canvas id="revenueChart"></canvas>
+    </div>
+    <div class="chart-card">
+        <h3 class="chart-title"><i data-lucide="activity"></i> Attendance Trend</h3>
+        <canvas id="attendanceChart"></canvas>
+    </div>
+</div>
+
+<div class="charts-grid">
+    <div class="chart-card">
+        <h3 class="chart-title"><i data-lucide="user-check"></i> Trainer Portfolio</h3>
+        <div class="table-wrap">
+            <table class="data-table" id="portfolioTable">
+                <thead><tr><th>Trainer</th><th>Students</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+    <div class="chart-card">
+        <h3 class="chart-title"><i data-lucide="scale"></i> Member Physical Stats (View)</h3>
+        <div class="table-wrap">
+            <table class="data-table" id="physicalTable">
+                <thead><tr><th>Name</th><th>Weight (kg)</th><th>Body Fat %</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', loadDashboard);
+
+async function loadDashboard() {
+    const res = await fetch('/api/stats');
+    const d = await res.json();
+
+    document.getElementById('statMembers').textContent = d.total_members;
+    document.getElementById('statTrainers').textContent = d.total_trainers;
+    document.getElementById('statRevenue').textContent = '₹' + d.total_revenue.toLocaleString();
+    document.getElementById('statBodyFat').textContent = d.avg_body_fat + '%';
+    document.getElementById('statPresent').textContent = d.present_today;
+
+    // Revenue chart
+    const revCtx = document.getElementById('revenueChart').getContext('2d');
+    const revGrad = revCtx.createLinearGradient(0, 0, 0, 400);
+    revGrad.addColorStop(0, 'rgba(255, 107, 0, 0.8)');
+    revGrad.addColorStop(1, 'rgba(255, 107, 0, 0.2)');
+
+    new Chart(revCtx, {
+        type: 'bar',
+        data: {
+            labels: d.monthly_revenue.map(r => r.month),
+            datasets: [{
+                label: 'Revenue (₹)',
+                data: d.monthly_revenue.map(r => r.total),
+                backgroundColor: revGrad,
+                borderColor: '#FF6B00',
+                borderWidth: 2,
+                borderRadius: 8,
+                hoverBackgroundColor: '#FF6B00',
+            }]
+        },
+        options: chartOptions('₹')
+    });
+
+    // Attendance chart
+    const attCtx = document.getElementById('attendanceChart').getContext('2d');
+    const attData = d.attendance_trend.reverse();
+    new Chart(attCtx, {
+        type: 'line',
+        data: {
+            labels: attData.map(a => a.Date),
+            datasets: [
+                {
+                    label: 'Present',
+                    data: attData.map(a => a.present_count),
+                    borderColor: '#00F0FF',
+                    backgroundColor: 'rgba(0, 240, 255, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#00F0FF',
+                    pointRadius: 4,
+                },
+                {
+                    label: 'Absent',
+                    data: attData.map(a => a.absent_count),
+                    borderColor: '#EF4444',
+                    backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#EF4444',
+                    pointRadius: 0,
+                }
+            ]
+        },
+        options: chartOptions()
+    });
+
+    // Portfolio table
+    const ptb = document.querySelector('#portfolioTable tbody');
+    ptb.innerHTML = d.portfolio.map(r =>
+        `<tr><td>${r.Trainer_Name}</td><td>${r.Total_Students}</td></tr>`
+    ).join('');
+
+    // Physical stats table
+    const pstb = document.querySelector('#physicalTable tbody');
+    pstb.innerHTML = d.physical_stats.map(r =>
+        `<tr><td>${r.Name}</td><td>${r.Weight}</td><td>${r.Body_Fat_Pct}%</td></tr>`
+    ).join('');
+
+    lucide.createIcons();
+}
+
+function chartOptions(prefix = '') {
+    return {
+        responsive: true,
+        plugins: {
+            legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } }
+        },
+        scales: {
+            x: { ticks: { color: '#64748b', font: { family: 'Inter' } }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { ticks: { color: '#64748b', font: { family: 'Inter' }, callback: v => prefix + v }, grid: { color: 'rgba(255,255,255,0.05)' } }
+        }
+    };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% block title %}Body Measurements — GymTrack Pro{% endblock %}
+{% block page_title %}Body Measurements{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <p class="page-subtitle">Track body stats and visualize progress over time</p>
+    <button class="btn btn-primary" onclick="openMeasurementModal()">
+        <i data-lucide="plus"></i> Add Measurement
+    </button>
+</div>
+
+<!-- Progress Chart Section -->
+<div class="card" style="margin-bottom: 1.5rem;">
+    <h3 class="chart-title" style="margin-bottom: 1rem;"><i data-lucide="trending-up"></i> Member Progress</h3>
+    <div class="form-group" style="max-width:300px; margin-bottom: 1rem;">
+        <label>Select Member</label>
+        <select id="progressMember" onchange="loadProgress(this.value)">
+            <option value="">-- Select --</option>
+        </select>
+    </div>
+    <canvas id="progressChart" height="100"></canvas>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="data-table" id="measurementsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Member</th>
+                    <th>Date</th>
+                    <th>Weight (kg)</th>
+                    <th>Chest (cm)</th>
+                    <th>Waist (cm)</th>
+                    <th>Biceps (cm)</th>
+                    <th>Body Fat %</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="measurementsBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+let progressChart = null;
+document.addEventListener('DOMContentLoaded', () => { loadMeasurements(); loadMemberSelect(); });
+
+async function loadMemberSelect() {
+    const res = await fetch('/api/members');
+    const members = await res.json();
+    const sel = document.getElementById('progressMember');
+    members.forEach(m => {
+        sel.innerHTML += `<option value="${m.Member_ID}">${m.Name}</option>`;
+    });
+}
+
+async function loadProgress(mid) {
+    if (!mid) return;
+    const res = await fetch(`/api/measurements/progress/${mid}`);
+    const data = await res.json();
+    if (progressChart) progressChart.destroy();
+    const ctx = document.getElementById('progressChart').getContext('2d');
+    progressChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.map(d => d.Date),
+            datasets: [
+                { label: 'Weight (kg)', data: data.map(d => d.Weight), borderColor: '#ff6b35', backgroundColor: 'rgba(255,107,53,0.1)', fill: true, tension: 0.4 },
+                { label: 'Body Fat %', data: data.map(d => d.Body_Fat_Pct), borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.1)', fill: true, tension: 0.4 },
+                { label: 'Biceps (cm)', data: data.map(d => d.Biceps), borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: true, tension: 0.4 },
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { labels: { color: '#94a3b8', font: { family: 'Inter' } } } },
+            scales: {
+                x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { ticks: { color: '#64748b' }, grid: { color: 'rgba(255,255,255,0.05)' } }
+            }
+        }
+    });
+}
+
+async function loadMeasurements() {
+    const res = await fetch('/api/measurements');
+    const ms = await res.json();
+    const tbody = document.getElementById('measurementsBody');
+    tbody.innerHTML = ms.map(m => `
+        <tr>
+            <td>${m.Measurement_ID}</td>
+            <td><strong>${m.Member_Name}</strong></td>
+            <td>${m.Date}</td>
+            <td>${m.Weight}</td>
+            <td>${m.Chest}</td>
+            <td>${m.Waist}</td>
+            <td>${m.Biceps}</td>
+            <td><span class="badge badge-purple">${m.Body_Fat_Pct}%</span></td>
+            <td class="actions">
+                <button class="btn-icon btn-delete" onclick="deleteMeasurement(${m.Measurement_ID})" title="Delete">
+                    <i data-lucide="trash-2"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+    lucide.createIcons();
+}
+
+async function openMeasurementModal() {
+    document.getElementById('modalTitle').textContent = 'Add Body Measurement';
+    
+    // Fetch members for dropdown
+    const mRes = await fetch('/api/members');
+    const members = await mRes.json();
+    const memberOptions = members.map(m => 
+        `<option value="${m.Member_ID}">${m.Name} (ID: ${m.Member_ID})</option>`
+    ).join('');
+
+    document.getElementById('modalBody').innerHTML = `
+        <form onsubmit="saveMeasurement(event)">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Select Member</label>
+                    <select name="Member_ID" required>
+                        <option value="">-- Select Member --</option>
+                        ${memberOptions}
+                    </select>
+                </div>
+                <div class="form-group"><label>Date</label><input type="date" name="Date" value="${new Date().toISOString().split('T')[0]}" required></div>
+                <div class="form-group"><label>Weight (kg)</label><input type="number" step="0.1" name="Weight" min="30" max="200" required></div>
+                <div class="form-group"><label>Chest (cm)</label><input type="number" step="0.1" name="Chest" required></div>
+                <div class="form-group"><label>Waist (cm)</label><input type="number" step="0.1" name="Waist" required></div>
+                <div class="form-group"><label>Biceps (cm)</label><input type="number" step="0.1" name="Biceps" required></div>
+                <div class="form-group"><label>Body Fat %</label><input type="number" step="0.1" name="Body_Fat_Pct" required></div>
+            </div>
+            <p class="form-hint">⚡ Trigger: Weight must be between 30-200 kg (Check_Weight_Limit)</p>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Measurement</button>
+            </div>
+        </form>
+    `;
+    openModal();
+    lucide.createIcons();
+}
+
+async function saveMeasurement(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = Object.fromEntries(fd);
+    const res = await fetch('/api/measurements', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+    const result = await res.json();
+    if (result.success) { showToast('Measurement added!', 'success'); closeModal(); loadMeasurements(); }
+    else showToast('Error: ' + result.error, 'error');
+}
+
+async function deleteMeasurement(id) {
+    if (!confirm('Delete this measurement?')) return;
+    const res = await fetch(`/api/measurements/${id}`, { method: 'DELETE' });
+    const result = await res.json();
+    if (result.success) { showToast('Deleted!', 'success'); loadMeasurements(); }
+    else showToast('Error: ' + result.error, 'error');
+}
+</script>
+{% endblock %}

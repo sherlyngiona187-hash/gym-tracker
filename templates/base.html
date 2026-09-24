@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Gym Body Tracking Management System — Track workouts, diet, body measurements, and more.">
+    <title>{% block title %}GymTrack Pro{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Lexend:wght@600;700;800&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="layout-wrapper">
+        <!-- SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <a href="/" class="logo">
+                <i data-lucide="dumbbell"></i>
+                <span class="brand-text">GymTrack Pro</span>
+            </a>
+            <nav class="nav-links">
+                <a href="/" class="nav-link {% if page=='dashboard' %}active{% endif %}" id="nav-dashboard">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/members" class="nav-link {% if page=='members' %}active{% endif %}" id="nav-members">
+                    <i data-lucide="users"></i>
+                    <span>Members</span>
+                </a>
+                <a href="/trainers" class="nav-link {% if page=='trainers' %}active{% endif %}" id="nav-trainers">
+                    <i data-lucide="user-check"></i>
+                    <span>Trainers</span>
+                </a>
+                <a href="/workouts" class="nav-link {% if page=='workouts' %}active{% endif %}" id="nav-workouts">
+                    <i data-lucide="flame"></i>
+                    <span>Workouts</span>
+                </a>
+                <a href="/diet" class="nav-link {% if page=='diet' %}active{% endif %}" id="nav-diet">
+                    <i data-lucide="apple"></i>
+                    <span>Diet Plans</span>
+                </a>
+                <a href="/measurements" class="nav-link {% if page=='measurements' %}active{% endif %}" id="nav-measurements">
+                    <i data-lucide="ruler"></i>
+                    <span>Body Stats</span>
+                </a>
+                <a href="/attendance" class="nav-link {% if page=='attendance' %}active{% endif %}" id="nav-attendance">
+                    <i data-lucide="calendar-check"></i>
+                    <span>Attendance</span>
+                </a>
+                <a href="/payments" class="nav-link {% if page=='payments' %}active{% endif %}" id="nav-payments">
+                    <i data-lucide="credit-card"></i>
+                    <span>Payments</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <header class="page-header">
+                <div>
+                    <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+                </div>
+            </header>
+            
+            <div class="main-area">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL (reusable) -->
+    <div class="modal-overlay" id="modalOverlay" onclick="closeModal()">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 id="modalTitle" class="h-font">Add Item</h2>
+                <button class="btn-icon" onclick="closeModal()">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Dynamic form goes here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="/static/js/app.js"></script>
+    <script>lucide.createIcons();</script>
+</body>
+</html>

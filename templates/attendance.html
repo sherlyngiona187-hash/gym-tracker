@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Attendance — GymTrack Pro{% endblock %}
+{% block page_title %}Attendance{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <p class="page-subtitle">Track daily gym attendance</p>
+    <button class="btn btn-primary" onclick="openAttendanceModal()">
+        <i data-lucide="plus"></i> Mark Attendance
+    </button>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="data-table" id="attendanceTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Member</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="attendanceBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', loadAttendance);
+
+async function loadAttendance() {
+    const res = await fetch('/api/attendance');
+    const atts = await res.json();
+    const tbody = document.getElementById('attendanceBody');
+    tbody.innerHTML = atts.map(a => `
+        <tr>
+            <td>${a.Attendance_ID}</td>
+            <td><strong>${a.Member_Name}</strong></td>
+            <td>${a.Date}</td>
+            <td><span class="badge badge-${a.Status === 'Present' ? 'green' : 'red'}">${a.Status}</span></td>
+            <td class="actions">
+                <button class="btn-icon btn-delete" onclick="deleteAttendance(${a.Attendance_ID})" title="Delete">
+                    <i data-lucide="trash-2"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+    lucide.createIcons();
+}
+
+async function openAttendanceModal() {
+    document.getElementById('modalTitle').textContent = 'Mark Attendance';
+    
+    // Fetch members for dropdown
+    const mRes = await fetch('/api/members');
+    const members = await mRes.json();
+    const memberOptions = members.map(m => 
+        `<option value="${m.Member_ID}">${m.Name} (ID: ${m.Member_ID})</option>`
+    ).join('');
+
+    document.getElementById('modalBody').innerHTML = `
+        <form onsubmit="saveAttendance(event)">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Select Member</label>
+                    <select name="Member_ID" required>
+                        <option value="">-- Select Member --</option>
+                        ${memberOptions}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" name="Date" value="${new Date().toISOString().split('T')[0]}">
+                </div>
+                <div class="form-group">
+                    <label>Status</label>
+                    <select name="Status" required>
+                        <option value="Present">Present</option>
+                        <option value="Absent">Absent</option>
+                    </select>
+                </div>
+            </div>
+            <p class="form-hint">⚡ Trigger: If Date is NULL, auto-sets to today (Before_Attendance_Insert)</p>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Mark Attendance</button>
+            </div>
+        </form>
+    `;
+    openModal();
+    lucide.createIcons();
+}
+
+async function saveAttendance(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = Object.fromEntries(fd);
+    const res = await fetch('/api/attendance', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+    const result = await res.json();
+    if (result.success) { showToast('Attendance marked!', 'success'); closeModal(); loadAttendance(); }
+    else showToast('Error: ' + result.error, 'error');
+}
+
+async function deleteAttendance(id) {
+    if (!confirm('Delete this record?')) return;
+    const res = await fetch(`/api/attendance/${id}`, { method: 'DELETE' });
+    const result = await res.json();
+    if (result.success) { showToast('Deleted!', 'success'); loadAttendance(); }
+    else showToast('Error: ' + result.error, 'error');
+}
+</script>
+{% endblock %}

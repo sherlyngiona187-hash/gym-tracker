@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}Payments — GymTrack Pro{% endblock %}
+{% block page_title %}Payments{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <p class="page-subtitle">Track membership payments and revenue</p>
+    <button class="btn btn-primary" onclick="openPaymentModal()">
+        <i data-lucide="plus"></i> Add Payment
+    </button>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="data-table" id="paymentsTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Member</th>
+                    <th>Amount</th>
+                    <th>Date</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="paymentsBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', loadPayments);
+
+async function loadPayments() {
+    const res = await fetch('/api/payments');
+    const payments = await res.json();
+    const tbody = document.getElementById('paymentsBody');
+    tbody.innerHTML = payments.map(p => `
+        <tr>
+            <td>${p.Payment_ID}</td>
+            <td><strong>${p.Member_Name}</strong></td>
+            <td><span class="badge badge-green">₹${parseFloat(p.Amount).toLocaleString()}</span></td>
+            <td>${p.Payment_Date}</td>
+            <td class="actions">
+                <button class="btn-icon btn-delete" onclick="deletePayment(${p.Payment_ID})" title="Delete">
+                    <i data-lucide="trash-2"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+    lucide.createIcons();
+}
+
+async function openPaymentModal() {
+    document.getElementById('modalTitle').textContent = 'Add Payment';
+    
+    // Fetch members for dropdown
+    const mRes = await fetch('/api/members');
+    const members = await mRes.json();
+    const memberOptions = members.map(m => 
+        `<option value="${m.Member_ID}">${m.Name} (ID: ${m.Member_ID})</option>`
+    ).join('');
+
+    document.getElementById('modalBody').innerHTML = `
+        <form onsubmit="savePayment(event)">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Select Member</label>
+                    <select name="Member_ID" required>
+                        <option value="">-- Select Member --</option>
+                        ${memberOptions}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Amount (₹)</label>
+                    <input type="number" step="0.01" name="Amount" required>
+                </div>
+                <div class="form-group">
+                    <label>Payment Date</label>
+                    <input type="date" name="Payment_Date" value="${new Date().toISOString().split('T')[0]}" required>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Add Payment</button>
+            </div>
+        </form>
+    `;
+    openModal();
+    lucide.createIcons();
+}
+
+async function savePayment(e) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = Object.fromEntries(fd);
+    const res = await fetch('/api/payments', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+    const result = await res.json();
+    if (result.success) { showToast('Payment recorded!', 'success'); closeModal(); loadPayments(); }
+    else showToast('Error: ' + result.error, 'error');
+}
+
+async function deletePayment(id) {
+    if (!confirm('Delete this payment record?')) return;
+    const res = await fetch(`/api/payments/${id}`, { method: 'DELETE' });
+    const result = await res.json();
+    if (result.success) { showToast('Deleted!', 'success'); loadPayments(); }
+    else showToast('Error: ' + result.error, 'error');
+}
+</script>
+{% endblock %}

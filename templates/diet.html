@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Diet Plans — GymTrack Pro{% endblock %}
+{% block page_title %}Diet Plans{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <p class="page-subtitle">Manage nutrition and diet plans</p>
+    <button class="btn btn-primary" onclick="openDietModal()">
+        <i data-lucide="plus"></i> Add Diet Plan
+    </button>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="data-table" id="dietTable">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Diet Type</th>
+                    <th>Calories</th>
+                    <th>Protein (g)</th>
+                    <th>Member</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="dietBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', loadDiet);
+
+async function loadDiet() {
+    const res = await fetch('/api/diet');
+    const diets = await res.json();
+    const tbody = document.getElementById('dietBody');
+    tbody.innerHTML = diets.map(d => `
+        <tr>
+            <td>${d.Diet_ID}</td>
+            <td><strong>${d.Diet_Type}</strong></td>
+            <td><span class="badge badge-amber">${d.Calories} kcal</span></td>
+            <td>${d.Protein_Grams}g</td>
+            <td>${d.Member_Name || '<span class="text-muted">Unassigned</span>'}</td>
+            <td class="actions">
+                <button class="btn-icon btn-edit" onclick='openDietModal(${JSON.stringify(d)})' title="Edit">
+                    <i data-lucide="pencil"></i>
+                </button>
+                <button class="btn-icon btn-delete" onclick="deleteDiet(${d.Diet_ID})" title="Delete">
+                    <i data-lucide="trash-2"></i>
+                </button>
+            </td>
+        </tr>
+    `).join('');
+    lucide.createIcons();
+}
+
+async function openDietModal(d = null) {
+    const isEdit = !!d;
+    document.getElementById('modalTitle').textContent = isEdit ? 'Edit Diet Plan' : 'Add Diet Plan';
+
+    // Fetch members for dropdown
+    const mRes = await fetch('/api/members');
+    const members = await mRes.json();
+    const memberOptions = members.map(m => 
+        `<option value="${m.Member_ID}" ${isEdit && d.Member_ID === m.Member_ID ? 'selected' : ''}>${m.Name} (ID: ${m.Member_ID})</option>`
+    ).join('');
+
+    document.getElementById('modalBody').innerHTML = `
+        <form onsubmit="saveDiet(event, ${isEdit ? d.Diet_ID : 'null'})">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Select Member</label>
+                    <select name="Member_ID" required>
+                        <option value="">-- Select Member --</option>
+                        ${memberOptions}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Diet Type</label>
+                    <input type="text" name="Diet_Type" value="${isEdit ? d.Diet_Type : ''}" required>
+                </div>
+                <div class="form-group">
+                    <label>Calories</label>
+                    <input type="number" name="Calories" value="${isEdit ? d.Calories : ''}" min="0" required>
+                </div>
+                <div class="form-group">
+                    <label>Protein (grams)</label>
+                    <input type="number" name="Protein_Grams" value="${isEdit ? d.Protein_Grams : ''}" required>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">${isEdit ? 'Update' : 'Add'} Plan</button>
+            </div>
+        </form>
+    `;
+    openModal();
+    lucide.createIcons();
+}
+
+async function saveDiet(e, id) {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const data = Object.fromEntries(fd);
+    const url = id ? `/api/diet/${id}` : '/api/diet';
+    const method = id ? 'PUT' : 'POST';
+    const res = await fetch(url, { method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+    const result = await res.json();
+    if (result.success) { showToast(id ? 'Diet updated!' : 'Diet added!', 'success'); closeModal(); loadDiet(); }
+    else showToast('Error: ' + result.error, 'error');
+}
+
+async function deleteDiet(id) {
+    if (!confirm('Delete this diet plan?')) return;
+    const res = await fetch(`/api/diet/${id}`, { method: 'DELETE' });
+    const result = await res.json();
+    if (result.success) { showToast('Diet deleted!', 'success'); loadDiet(); }
+    else showToast('Error: ' + result.error, 'error');
+}
+</script>
+{% endblock %}
